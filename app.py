@@ -5,14 +5,9 @@ import uuid
 import threading
 import webbrowser
 
-from flask import Flask, jsonify, render_template, request, send_file
-from flask import Flask, render_template, request, send_file, session, redirect, url_for, jsonify
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
+from werkzeug.utils import secure_filename
 from docx.opc.exceptions import PackageNotFoundError
-from werkzeug.utils import secure_filename
-
-from flask import Flask, render_template, request, send_file
-from werkzeug.utils import secure_filename
 
 from analyzer.pdf_reader import extract_pdf_text
 from analyzer.docx_reader import DocxReadError, check_docx_file
@@ -26,7 +21,6 @@ from analyzer.keyword_analyzer import analyze_keywords
 from analyzer.ats_checker import analyze_ats
 from analyzer.job_matcher import match_resume_to_job
 from analyzer.report_generator import build_report, build_txt_report
-from analyzer.report_generator import build_report
 from analyzer.section_quality import analyze_section_quality
 from analyzer.project_checker import check_project_descriptions
 from analyzer.action_verb_analyzer import analyze_action_verbs
@@ -40,6 +34,7 @@ from analyzer.validator import (
     validate_report_download,
     validate_resume_upload,
     wants_json_response,
+)
 from analyzer.duplicate_detector import detect_duplicates
 from analyzer.skill_gap_analyzer import analyze_skill_gap, get_supported_roles
 from analyzer.roadmap_generator import generate_roadmap, calculate_roadmap_progress
@@ -83,28 +78,6 @@ def analyze():
         return error_resp
 
     file_type = extension[1:].upper()
-    filename = secure_filename(file.filename)
-    unique_filename = f"{uuid.uuid4().hex}_{filename}"
-    file = request.files["resume"]
-
-    if not file.filename:
-        return "No file selected."
-
-    original_filename = file.filename
-    extension = os.path.splitext(original_filename.lower())[1]
-    extension = os.path.splitext(original_filename)[1].lower()
-
-    if extension not in ALLOWED_EXTENSIONS:
-        return "Only PDF and DOCX files are allowed."
-
-    # Used in messages shown to the user: "PDF" or "DOCX"
-    file_type = extension[1:].upper()
-
-    filename = secure_filename(original_filename)
-
-    if not filename:
-        return "Invalid filename."
-
     unique_filename = generate_secure_filename(extension)
 
     filepath = os.path.join(
@@ -113,7 +86,6 @@ def analyze():
     )
 
     try:
-        # Save the uploaded resume
         # Save the uploaded resume.
         file.save(filepath)
 
@@ -129,7 +101,6 @@ def analyze():
                 request=request,
                 legacy_200_for_html=True,
             )
-            return f"No readable text found in this {file_type}."
 
         # Detect and organize sections
         resume_sections = extract_sections(resume_text)
@@ -179,10 +150,19 @@ def analyze():
 
         # Section Quality Analysis (Issue #51)
         section_quality = analyze_section_quality(
+            resume_text,
+            resume_sections=resume_sections
+        )
         # Project Description Quality Analysis (Issue #52)
         project_analysis = check_project_descriptions(
+            resume_text,
+            resume_sections=resume_sections
+        )
         # Action Verb Analysis (Issue #54)
         action_verb_analysis = analyze_action_verbs(
+            resume_text,
+            resume_sections=resume_sections
+        )
         # Readability Analysis (Issue #55)
         readability_analysis = analyze_readability(resume_text)
         # Timeline & Date Consistency Analysis (Issue #53)
@@ -325,9 +305,6 @@ def analyze():
             request=request,
             legacy_200_for_html=True,
         )
-        return str(error)
-        # A file named .docx that is not a real Word document
-        return "This file is not a valid DOCX document."
 
     except Exception as error:
         print("Analysis Error:", error)
@@ -389,14 +366,24 @@ def download_report():
 
 
 @app.route("/download-txt-report", methods=["POST"])
+@app.route("/api/download-txt-report", methods=["POST"])
 def download_txt_report():
 
+    is_valid, report_dict, error_resp = validate_report_download(request)
+    if not is_valid:
+        return error_resp
+
     try:
-        report_data = json.loads(request.form["report"])
-        txt_content = build_txt_report(report_data)
+        txt_content = build_txt_report(report_dict)
     except Exception as error:
         print("TXT Report Error:", error)
-        return "Unable to create the report. Please analyze your resume again.", 400
+        return format_error_response(
+            message="Unable to create the report. Please analyze your resume again.",
+            status_code=400,
+            error_code="REPORT_GENERATION_FAILED",
+            request=request,
+            legacy_200_for_html=False,
+        )
 
     return send_file(
         io.BytesIO(txt_content.encode("utf-8")),

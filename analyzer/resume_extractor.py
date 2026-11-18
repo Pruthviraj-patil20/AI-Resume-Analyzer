@@ -35,30 +35,26 @@ def extract_pdf_text(
     reader = (reader_class or PdfReader)(filepath)
     text = ""
 
-    for page in reader.pages:
-        page_text = page.extract_text() or ""
-
-        # Normal text extraction for pages with sufficient text
-        if len(page_text.strip()) >= min_text_chars or not enable_ocr:
-            if page_text:
-                text += page_text + "\n"
-            continue
-
-        # Page has insufficient extractable text: check for scanned images to OCR
-        images = extract_images_from_page(page)
-        if images:
-            ocr_text = extract_ocr_from_images(images)
-            parts = [p.strip() for p in (page_text, ocr_text) if p and p.strip()]
-            if parts:
-                text += "\n".join(parts) + "\n"
-        else:
-            if page_text:
-                text += page_text + "\n"
     try:
         for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
+            page_text = page.extract_text() or ""
+
+            # Normal text extraction for pages with sufficient text
+            if len(page_text.strip()) >= min_text_chars or not enable_ocr:
+                if page_text:
+                    text += page_text + "\n"
+                continue
+
+            # Page has insufficient extractable text: check for scanned images to OCR
+            images = extract_images_from_page(page)
+            if images:
+                ocr_text = extract_ocr_from_images(images)
+                parts = [p.strip() for p in (page_text, ocr_text) if p and p.strip()]
+                if parts:
+                    text += "\n".join(parts) + "\n"
+            else:
+                if page_text:
+                    text += page_text + "\n"
     finally:
         # Ensure file streams opened by PdfReader are explicitly closed
         if hasattr(reader, "close"):
