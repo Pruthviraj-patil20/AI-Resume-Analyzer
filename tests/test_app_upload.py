@@ -98,6 +98,9 @@ class UploadTests(unittest.TestCase):
 
         self.assertIn("ATS Compatibility Analysis", html)
         self.assertIn("Python", html)
+        self.assertIn("/download-txt-report", html)
+        self.assertIn("Export as TXT", html)
+        self.assert_uploads_empty()
         self.assert_uploads_empty()
 
     def test_pdf_and_docx_find_the_same_skills(self):

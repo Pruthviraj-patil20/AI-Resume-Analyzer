@@ -65,6 +65,24 @@ The app opens at http://127.0.0.1:5000. Upload a PDF or DOCX resume and check th
 Please test with your own resume or a sample one. Do not upload other people's
 resumes to the repository.
 
+## Evaluation & Accuracy Benchmarking
+
+The project includes an automated benchmark suite to evaluate skill extraction precision, recall, and F1-score against synthetic test resumes containing zero real-world personal information:
+
+```bash
+# Run the evaluation benchmark summary
+python -m benchmarks.run_benchmark
+
+# Show detailed per-sample accuracy breakdown
+python -m benchmarks.run_benchmark --verbose
+
+# Save evaluation results as JSON
+python -m benchmarks.run_benchmark --output benchmarks/baseline.json
+
+# Compare accuracy against a saved baseline to verify improvements or prevent regressions
+python -m benchmarks.run_benchmark --compare benchmarks/baseline.json
+```
+
 ## How to contribute
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
