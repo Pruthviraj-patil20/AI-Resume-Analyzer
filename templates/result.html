@@ -155,7 +155,7 @@
 
                 <div class="keyword-bar-track">
                     <div class="keyword-bar keyword-{{ item.status }}"
-                         style="width: {{ item.bar_width }}%"></div>
+                         data-width="{{ item.bar_width }}"></div>
                 </div>
 
                 <div class="keyword-stats">
@@ -285,6 +285,11 @@
 
         {% else %}
             <p>No major gaps found. Re-read your resume once to check it is accurate and up to date.</p>
+        {% endfor %}
+
+    </section>
+
+
     <!-- ATS Compatibility -->
     <section class="result-card">
 
@@ -461,7 +466,7 @@
     <!-- Progress Bar JavaScript -->
      <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-        document.querySelectorAll('.progress-fill').forEach(bar => {
+        document.querySelectorAll('.progress-fill, .keyword-bar').forEach(bar => {
             bar.style.width = bar.dataset.width + '%';
         });
     </script>

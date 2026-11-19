@@ -3,11 +3,11 @@ import uuid
 import threading
 import webbrowser
 
+from docx.opc.exceptions import PackageNotFoundError
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 
-from analyzer.pdf_reader import extract_pdf_text
-from analyzer.docx_reader import extract_docx_text, DocxReadError
+from analyzer.docx_reader import DocxReadError
 from analyzer.resume_extractor import extract_resume_text
 from analyzer.section_detector import extract_sections
 from analyzer.skills_extractor import extract_skills, get_suggestions
@@ -48,18 +48,14 @@ def analyze():
     if not file.filename:
         return "No file selected."
 
-    extension = os.path.splitext(file.filename.lower())[1]
+    original_filename = file.filename
+    extension = os.path.splitext(original_filename)[1].lower()
 
     if extension not in ALLOWED_EXTENSIONS:
         return "Only PDF and DOCX files are allowed."
 
     # Used in messages shown to the user: "PDF" or "DOCX"
     file_type = extension[1:].upper()
-    original_filename = file.filename
-    extension = os.path.splitext(original_filename)[1].lower()
-
-    if extension not in {".pdf", ".docx"}:
-        return "Only PDF and DOCX files are allowed."
 
     filename = secure_filename(original_filename)
 
@@ -74,17 +70,6 @@ def analyze():
     )
 
     try:
-        # Save the uploaded resume
-        file.save(filepath)
-
-        # Extract text (the rest of the analysis is the same for both types)
-        if extension == ".docx":
-            resume_text = extract_docx_text(filepath)
-        else:
-            resume_text = extract_pdf_text(filepath)
-
-        if not resume_text.strip():
-            return f"No readable text found in this {file_type}."
         # Save the uploaded resume.
         file.save(filepath)
 
@@ -122,7 +107,6 @@ def analyze():
         ats_result = analyze_ats(resume_text, found_skills)
 
         # Job Description Matching
-        job_description = request.form.get("job_description", "")
         job_match = match_resume_to_job(found_skills, job_description)
 
         print("\n========== RESUME ANALYSIS ==========")
@@ -142,15 +126,19 @@ def analyze():
             resume_text=resume_text,
             resume_score=resume_score,
             score_breakdown=score_breakdown,
-            recommendations=recommendations
-            keyword_analysis=keyword_analysis
+            recommendations=recommendations,
+            keyword_analysis=keyword_analysis,
             ats_result=ats_result,
             resume_sections=resume_sections,
             job_match=job_match
         )
 
-    except DocxReadError as error:
-        # The message was written for the user, so it is safe to show
+    except (DocxReadError, PackageNotFoundError) as error:
+        # DocxReadError messages are written for the user, so they are safe
+        # to show. PackageNotFoundError comes from python-docx when the
+        # uploaded file is not a valid DOCX.
+        if isinstance(error, PackageNotFoundError):
+            return "This file is not a valid DOCX document."
         return str(error)
 
     except Exception as error:
@@ -159,9 +147,6 @@ def analyze():
             f"Unable to analyze this {file_type}. "
             f"Please try another {file_type}."
         )
-        if extension == ".pdf":
-            return "Unable to analyze this PDF. Please try another PDF."
-        return "Unable to analyze this DOCX. Please try another DOCX."
 
     finally:
         if filepath and os.path.exists(filepath):
